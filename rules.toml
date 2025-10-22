@@ -1,0 +1,494 @@
+[metadata]
+version = "2.0"
+description = "Solray Audit - Comprehensive Solana Security Scanner (Sec3 X-Ray Compatible)"
+last_updated = "2025-01-22"
+author = "Solray Audit Team"
+based_on = "Sec3 X-Ray, Helius, Cantina, SlowMist"
+
+[analysis_mode]
+regex = true
+ast = true   # Enable AST for comprehensive analysis
+llm = false
+
+[[rules]]
+id = "S-1001"
+description = "Missing Signer Check: Fails to verify if an account signed the transaction, allowing unauthorized ops."
+severity = "high"
+patterns = ["(invoke|transfer|token::transfer).*?(?<!is_signer|require\\(|assert\\(|if\\s+\\w+\\.is_signer)"]
+enabled = true
+mitigation = "Check `AccountInfo::is_signer`. Use Anchor's `Signer<'info>`."
+
+[[rules]]
+id = "S-1002"
+description = "Missing Ownership Check: Allows tampered accounts by not verifying owner == program_id."
+severity = "high"
+patterns = ["(account|init_account|create_account).*?(?<!owner|require_keys|seeds)"]
+enabled = true
+mitigation = "Verify `account.owner == program_id`. Use Anchor's `Account<'info, T>`."
+
+[[rules]]
+id = "S-1003"
+description = "Integer Overflow/Underflow: Unchecked arithmetic wraps in release mode, enabling balance exploits."
+severity = "critical"
+patterns = ["(\\+\\+|--|\\*/|-=).*?(?<!checked_|wrapping_|overflowing_|saturating_)"]
+enabled = true
+mitigation = "Use `checked_*` ops or enable `overflow-checks = true` in Cargo.toml."
+
+[[rules]]
+id = "S-1004"
+description = "Arbitrary CPI: Invokes unverified programs, risking malicious code execution."
+severity = "high"
+patterns = ["(invoke|cross_program_invocation).*?(?<!require_program|program_id)"]
+enabled = true
+mitigation = "Check callee's program ID before CPI. Use Anchor's CPI module."
+
+[[rules]]
+id = "S-1005"
+description = "Account Reloading Failure: Operates on stale data post-CPI due to no refresh."
+severity = "medium"
+patterns = ["invoke.*?(?<!reload\\()"]
+enabled = true
+mitigation = "Call `account.reload()?` after CPI."
+
+[[rules]]
+id = "S-1006"
+description = "Precision Loss: Rounding errors in fixed-point math lead to arbitrage or miscalculations."
+severity = "medium"
+patterns = ["(/\\s*\\d+).*?(?<!\\*\\s*\\d+)" ]  # Div before mul
+enabled = true
+mitigation = "Multiply before divide; use `try_floor_u64()` for rounding down."
+
+[[rules]]
+id = "S-1007"
+description = "Frontrunning: No checks on expected values allow price manipulation via bundlers."
+severity = "high"
+patterns = ["(transfer|buy|sell).*?(?<!expected_|assert_eq)"]
+enabled = true
+mitigation = "Add `expected_value` param and assert it."
+
+[[rules]]
+id = "S-1008"
+description = "PDA Bump/Seed Issues: Non-canonical bumps or collisions enable DoS or unauthorized access."
+severity = "medium"
+patterns = ["create_program_address.*?(?<!find_program_address)"]
+enabled = true
+mitigation = "Use `Pubkey::find_program_address` for canonical bump; unique seeds."
+
+[[rules]]
+id = "S-1009"
+description = "Account Confusion/Type Cosplay: Deserializes wrong type without discriminator check."
+severity = "medium"
+patterns = ["Account<'info, \\w+>.*?(?<!discriminator)"]
+enabled = true
+mitigation = "Add/verify discriminator in structs; use Anchor's `Account<'info, T>`."
+
+[[rules]]
+id = "S-1010"
+description = "Remaining Accounts Unvalidated: Bypasses checks on dynamic accounts, risking injection."
+severity = "high"
+patterns = ["remaining_accounts.*?(?<!validate|owner|data)"]
+enabled = true
+mitigation = "Loop and check each: owner, data structure."
+
+# Sec3 X-Ray Comprehensive Vulnerability Patterns
+# Based on Sec3's 55+ vulnerability types
+
+[[rules]]
+id = "S-2001"
+description = "Missing Rent Exemption Check: Account may be closed by rent collection."
+severity = "high"
+patterns = ["(init_account|create_account).*?(?<!rent_exempt|lamports)"]
+enabled = true
+mitigation = "Check rent exemption before account operations."
+
+[[rules]]
+id = "S-2002"
+description = "Account Data Confusion: Wrong account type deserialization without discriminator check."
+severity = "critical"
+patterns = ["Account<'info, \\w+>.*?(?<!discriminator|discriminator::check)"]
+enabled = true  # Re-enabled for security
+mitigation = "Add discriminator checks before deserialization."
+
+[[rules]]
+id = "S-2003"
+description = "Re-initiation Cross-Instance Confusion: Reinitializing accounts without proper checks."
+severity = "high"
+patterns = ["(init|reinit).*?(?<!is_initialized|initialized)"]
+enabled = true
+mitigation = "Check initialization state before reinitializing."
+
+[[rules]]
+id = "S-2004"
+description = "Arithmetic Underflow: Unchecked subtraction causing underflow."
+severity = "critical"
+patterns = ["(\\w+\\s*-\\s*\\w+).*?(?<!checked_sub|wrapping_sub|saturating_sub)"]
+enabled = true
+mitigation = "Use checked_sub, wrapping_sub, or saturating_sub."
+
+[[rules]]
+id = "S-2005"
+description = "Numerical Precision Errors: Float operations causing precision loss."
+severity = "medium"
+patterns = ["(f32|f64).*?(\\+|-|\\*|/)"]
+enabled = true
+mitigation = "Use fixed-point arithmetic or proper rounding."
+
+[[rules]]
+id = "S-2006"
+description = "Loss of Precision: Integer division before multiplication."
+severity = "medium"
+patterns = ["(\\w+\\s*/\\s*\\d+).*?(?<!\\*\\s*\\d+)"]
+enabled = true
+mitigation = "Multiply before divide to maintain precision."
+
+[[rules]]
+id = "S-2007"
+description = "Casting Truncation: Unsafe type casting causing data loss."
+severity = "medium"
+patterns = ["(as\\s+u8|as\\s+i8|as\\s+u16|as\\s+i16).*?(?<!checked)"]
+enabled = true
+mitigation = "Use checked casting or validate ranges."
+
+[[rules]]
+id = "S-2008"
+description = "Exponential Time Calculations: Unbounded loops or recursive calls."
+severity = "high"
+patterns = ["(for\\s+\\(.*\\)|while\\s+\\(.*\\)|loop\\s*\\{).*?(?<!break|return)"]
+enabled = true
+mitigation = "Add loop bounds and early termination conditions."
+
+[[rules]]
+id = "S-2009"
+description = "Missing Freeze Authority Check: SPL token freeze authority not validated."
+severity = "high"
+patterns = ["(freeze|thaw).*?(?<!authority|freeze_authority)"]
+enabled = true
+mitigation = "Validate freeze authority before freeze/thaw operations."
+
+[[rules]]
+id = "S-2010"
+description = "Insufficient SPL Token Account Verification: Token account not properly validated."
+severity = "high"
+patterns = ["(token_account|spl_token).*?(?<!owner|mint|amount)"]
+enabled = true
+mitigation = "Verify token account owner, mint, and amount."
+
+[[rules]]
+id = "S-2011"
+description = "Loan Logic Errors: Incorrect loan calculations."
+severity = "high"
+patterns = ["(loan|borrow|lend).*?(?<!checked|validated)"]
+enabled = true
+mitigation = "Add proper loan amount validation and checks."
+
+[[rules]]
+id = "S-2012"
+description = "Unverified Parsed Account: Deserializing before validation."
+severity = "critical"
+patterns = ["(try_from_slice|from_bytes).*?(?<!validate|check)"]
+enabled = true
+mitigation = "Validate account data before deserialization."
+
+[[rules]]
+id = "S-2013"
+description = "Type Confusion Full Cosplay: Complete type substitution attack."
+severity = "critical"
+patterns = ["Account<'info, \\w+>.*?(?<!discriminator)"]
+enabled = true
+mitigation = "Use discriminators to prevent type confusion."
+
+[[rules]]
+id = "S-2014"
+description = "Type Confusion Partial Cosplay: Partial type substitution."
+severity = "high"
+patterns = ["(deserialize|parse).*?(?<!discriminator)"]
+enabled = true
+mitigation = "Add discriminator checks for partial type validation."
+
+[[rules]]
+id = "S-2015"
+description = "Bump Seed Not Validated: PDA bump not canonical."
+severity = "medium"
+patterns = ["create_program_address.*?(?<!find_program_address)"]
+enabled = true
+mitigation = "Use find_program_address for canonical bumps."
+
+[[rules]]
+id = "S-2016"
+description = "Insecure PDA Sharing: PDA seeds not unique."
+severity = "medium"
+patterns = ["(seeds|bump).*?(?<!unique|canonical)"]
+enabled = true
+mitigation = "Ensure PDA seeds are unique and canonical."
+
+[[rules]]
+id = "S-2017"
+description = "Arbitrary CPI to Attacker Programs: Unverified program invocation."
+severity = "critical"
+patterns = ["invoke.*?(?<!program_id|require_program)"]
+enabled = true
+mitigation = "Validate program ID before CPI calls."
+
+[[rules]]
+id = "S-2018"
+description = "Malicious Simulation Code Paths: Simulation-specific vulnerabilities."
+severity = "high"
+patterns = ["(simulate|simulation).*?(?<!validate)"]
+enabled = true
+mitigation = "Add proper validation for simulation paths."
+
+[[rules]]
+id = "S-2019"
+description = "Incorrect Logic: Bad condition checks and loop breaks."
+severity = "medium"
+patterns = ["(if|while|for).*?(?<!\\s*\\{|\\s*\\})"]
+enabled = true
+mitigation = "Review logic conditions and loop termination."
+
+[[rules]]
+id = "S-2020"
+description = "Unvalidated CPI Program IDs: Program ID not checked before CPI."
+severity = "critical"
+patterns = ["invoke.*?(?<!require_keys_eq|program_id)"]
+enabled = true
+mitigation = "Use require_keys_eq to validate program IDs."
+
+[[rules]]
+id = "S-2021"
+description = "Abnormal Protocol State: Flash-loanable states detected."
+severity = "high"
+patterns = ["(flash_loan|borrow).*?(?<!state_check)"]
+enabled = true
+mitigation = "Add state validation for flash loan operations."
+
+[[rules]]
+id = "S-2022"
+description = "Flash Loan Vulnerability: Unprotected flash loan operations."
+severity = "critical"
+patterns = ["(flash_loan|instant_loan).*?(?<!protection|validation)"]
+enabled = true
+mitigation = "Add proper flash loan protection mechanisms."
+
+[[rules]]
+id = "S-2023"
+description = "Unchecked Account Writability: Expecting writable but not enforced."
+severity = "high"
+patterns = ["(mut|writable).*?(?<!is_writable)"]
+enabled = true
+mitigation = "Check account.is_writable before modifications."
+
+[[rules]]
+id = "S-2024"
+description = "Unchecked Account Signer Status: Expecting signer but not enforced."
+severity = "high"
+patterns = ["(signer|authority).*?(?<!is_signer)"]
+enabled = true
+mitigation = "Check account.is_signer before operations."
+
+[[rules]]
+id = "S-2025"
+description = "Missing PDA Substitution Protection: Wrong seeds producing look-alike accounts."
+severity = "high"
+patterns = ["(seeds|bump).*?(?<!canonical|unique)"]
+enabled = true
+mitigation = "Use canonical PDA derivation and validation."
+
+[[rules]]
+id = "S-2026"
+description = "Missing System Account Checks: System program not validated."
+severity = "medium"
+patterns = ["system_program.*?(?<!require_keys_eq)"]
+enabled = true
+mitigation = "Validate system program ID with require_keys_eq."
+
+[[rules]]
+id = "S-2027"
+description = "Missing Lamports Sanity Checks: Unexpected drains or underfunding."
+severity = "high"
+patterns = ["lamports.*?(?<!checked|validated)"]
+enabled = true
+mitigation = "Add lamports balance validation."
+
+[[rules]]
+id = "S-2028"
+description = "Oracle Usage Issues: Price validation or staleness not checked."
+severity = "high"
+patterns = ["(oracle|price|pyth).*?(?<!staleness|confidence)"]
+enabled = true
+mitigation = "Check oracle staleness and confidence intervals."
+
+[[rules]]
+id = "S-2029"
+description = "Unchecked Deserialization: Untrusted input decoding."
+severity = "critical"
+patterns = ["(deserialize|from_bytes).*?(?<!validate|check)"]
+enabled = true
+mitigation = "Validate input before deserialization."
+
+[[rules]]
+id = "S-2030"
+description = "Unchecked Authority Transfer: Mint/freeze/owner roles not validated."
+severity = "critical"
+patterns = ["(set_authority|transfer_authority).*?(?<!validate)"]
+enabled = true
+mitigation = "Validate authority before transfers."
+
+[[rules]]
+id = "S-2031"
+description = "Unchecked Token Mint/Burn Authorities: Token operations without authority check."
+severity = "high"
+patterns = ["(mint_to|burn).*?(?<!authority|signer)"]
+enabled = true
+mitigation = "Check mint/burn authority before operations."
+
+[[rules]]
+id = "S-2032"
+description = "Unchecked Associated Token Account: Ownership/derivation not validated."
+severity = "high"
+patterns = ["associated_token.*?(?<!owner|derivation)"]
+enabled = true
+mitigation = "Validate ATA ownership and derivation."
+
+[[rules]]
+id = "S-2033"
+description = "Anchor Constraint Bypasses: Using UncheckedAccount or missing constraints."
+severity = "high"
+patterns = ["UncheckedAccount.*?(?<!validate|constraint)"]
+enabled = true
+mitigation = "Add proper Anchor constraints and validation."
+
+[[rules]]
+id = "S-2034"
+description = "Unchecked PDA Signer Seeds: Misuse of invoke_signed."
+severity = "high"
+patterns = ["invoke_signed.*?(?<!seeds|bump)"]
+enabled = true
+mitigation = "Validate PDA seeds and bumps for invoke_signed."
+
+[[rules]]
+id = "S-2035"
+description = "Reentrancy-Adjacent Patterns: Self recursion causing logic flaws."
+severity = "medium"
+patterns = ["(recursive|self_call).*?(?<!depth|limit)"]
+enabled = false  # Disabled to reduce false positives
+mitigation = "Add recursion depth limits and state checks."
+
+[[rules]]
+id = "S-2036"
+description = "DoS via Compute Budget: Unbounded loops causing griefing."
+severity = "high"
+patterns = ["(loop|while|for).*?(?<!limit|bound)"]
+enabled = true
+mitigation = "Add loop bounds and compute budget checks."
+
+[[rules]]
+id = "S-2037"
+description = "DoS via Account Size Growth: Serialization bloat attacks."
+severity = "medium"
+patterns = ["(serialize|to_bytes).*?(?<!size_limit)"]
+enabled = true
+mitigation = "Add account size limits and validation."
+
+[[rules]]
+id = "S-2038"
+description = "Arithmetic on Uninitialized State: Operations on uninitialized data."
+severity = "critical"
+patterns = ["(\\+|-|\\*|/).*?(?<!initialized|default)"]
+enabled = true
+mitigation = "Ensure state initialization before arithmetic."
+
+[[rules]]
+id = "S-2039"
+description = "Unsafe Rust Usage: Unsafe blocks causing memory errors."
+severity = "critical"
+patterns = ["unsafe\\s*\\{"]
+enabled = true
+mitigation = "Avoid unsafe blocks or add proper validation."
+
+[[rules]]
+id = "S-2040"
+description = "Outdated Dependencies: Known CVEs in dependencies."
+severity = "medium"
+patterns = ["(version|dependency).*?(?<!audit|check)"]
+enabled = true
+mitigation = "Regularly audit and update dependencies."
+
+[[rules]]
+id = "S-2041"
+description = "Untrusted Sysvars: Mis-assumptions about sysvar contents."
+severity = "high"
+patterns = ["(sysvar|clock|rent).*?(?<!validate)"]
+enabled = true
+mitigation = "Validate sysvar data before use."
+
+[[rules]]
+id = "S-2042"
+description = "Account Duplication/Aliasing: Confused authority across CPI."
+severity = "high"
+patterns = ["(duplicate|alias).*?(?<!unique|distinct)"]
+enabled = true
+mitigation = "Ensure account uniqueness across CPI calls."
+
+[[rules]]
+id = "S-2043"
+description = "Missing Close Account Safety: Reclaiming lamports without conditions."
+severity = "medium"
+patterns = ["close.*?(?<!condition|state)"]
+enabled = true
+mitigation = "Add proper conditions before closing accounts."
+
+[[rules]]
+id = "S-2044"
+description = "Rounding/Decimals Mishandling: Fixed-point math errors."
+severity = "medium"
+patterns = ["(round|decimal|precision).*?(?<!checked)"]
+enabled = true
+mitigation = "Use proper rounding and decimal handling."
+
+[[rules]]
+id = "S-2045"
+description = "Time/Slot Drift: Assumptions breaking interest or vesting math."
+severity = "medium"
+patterns = ["(time|slot|timestamp).*?(?<!drift|validation)"]
+enabled = true
+mitigation = "Account for time drift in calculations."
+
+[[rules]]
+id = "S-2046"
+description = "Unchecked CPI to Token Program: Attacker-supplied accounts."
+severity = "critical"
+patterns = ["invoke.*token.*?(?<!validate|check)"]
+enabled = true
+mitigation = "Validate all accounts before token CPI."
+
+[[rules]]
+id = "S-2047"
+description = "Freeze/Thaw Misuse: Asset lock or theft via freeze operations."
+severity = "high"
+patterns = ["(freeze|thaw).*?(?<!authority|condition)"]
+enabled = true
+mitigation = "Add proper freeze/thaw authority checks."
+
+[[rules]]
+id = "S-2048"
+description = "Price Manipulation Windows: TWAP or lack thereof."
+severity = "high"
+patterns = ["(price|oracle).*?(?<!twap|manipulation)"]
+enabled = true
+mitigation = "Use TWAP or price manipulation protection."
+
+[[rules]]
+id = "S-2049"
+description = "Front-run/Sandwich Attacks: Economic attack surface."
+severity = "high"
+patterns = ["(swap|trade|exchange).*?(?<!slippage|protection)"]
+enabled = true
+mitigation = "Add slippage protection and MEV resistance."
+
+[[rules]]
+id = "S-2050"
+description = "Upgrade/Backdoor Vectors: Unchecked upgrade authority."
+severity = "critical"
+patterns = ["(upgrade|update).*?(?<!authority|multisig)"]
+enabled = true
+mitigation = "Use multisig for upgrade authority."
