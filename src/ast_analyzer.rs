@@ -1,5 +1,8 @@
-use syn::{visit::Visit, Expr, ExprCall, ExprMethodCall, ExprBinary, BinOp, ExprLoop, ExprWhile, ExprForLoop, ItemFn, ItemStruct, spanned::Spanned};
 use crate::Vulnerability;
+use syn::{
+    BinOp, Expr, ExprBinary, ExprCall, ExprForLoop, ExprLoop, ExprMethodCall, ExprWhile, ItemFn,
+    ItemStruct, spanned::Spanned, visit::Visit,
+};
 
 pub struct AstAnalyzer {
     vulnerabilities: Vec<Vulnerability>,
@@ -36,23 +39,30 @@ impl AstAnalyzer {
         self.deduplicate_vulnerabilities()
     }
 
-    fn get_line_number(&self, span: proc_macro2::Span) -> usize {
+    fn get_line_number(&self, _span: proc_macro2::Span) -> usize {
         // For now, return a placeholder line number
         // In a real implementation, you'd need to map span positions to line numbers
         1
     }
 
-    fn get_code_snippet(&self, span: proc_macro2::Span) -> String {
+    fn get_code_snippet(&self, _span: proc_macro2::Span) -> String {
         // For now, return a placeholder
         // In a real implementation, you'd extract the actual code snippet
         "code snippet".to_string()
     }
 
-    fn add_vulnerability(&mut self, rule_id: &str, description: &str, severity: &str, 
-                        mitigation: Option<&str>, span: proc_macro2::Span, _context: &str) {
+    fn add_vulnerability(
+        &mut self,
+        rule_id: &str,
+        description: &str,
+        severity: &str,
+        mitigation: Option<&str>,
+        span: proc_macro2::Span,
+        _context: &str,
+    ) {
         let line_number = self.get_line_number(span);
         let code_snippet = self.get_code_snippet(span);
-        
+
         // Only add if we have a valid line number and code snippet
         if line_number > 0 && !code_snippet.is_empty() && code_snippet != "unknown" {
             self.vulnerabilities.push(Vulnerability {
@@ -72,14 +82,18 @@ impl AstAnalyzer {
         // Remove duplicates based on rule_id, line_number, and code_snippet
         let mut seen = std::collections::HashSet::new();
         let mut unique_vulns = Vec::new();
-        
+
         for vuln in self.vulnerabilities.drain(..) {
-            let key = (vuln.rule_id.clone(), vuln.line_number, vuln.code_snippet.clone());
+            let key = (
+                vuln.rule_id.clone(),
+                vuln.line_number,
+                vuln.code_snippet.clone(),
+            );
             if seen.insert(key) {
                 unique_vulns.push(vuln);
             }
         }
-        
+
         unique_vulns
     }
 }
@@ -202,7 +216,7 @@ impl AstAnalyzer {
             "high",
             Some("Verify account ownership and signer validation before transfer"),
             call.span(),
-            "transfer call"
+            "transfer call",
         );
     }
 
@@ -226,7 +240,7 @@ impl AstAnalyzer {
             "critical",
             Some("Use checked_* methods or enable overflow-checks in Cargo.toml"),
             binary.span(),
-            "arithmetic operation"
+            "arithmetic operation",
         );
     }
 
@@ -238,7 +252,7 @@ impl AstAnalyzer {
             "critical",
             Some("Validate input data before deserialization"),
             call.span(),
-            "try_from_slice/from_bytes call"
+            "try_from_slice/from_bytes call",
         );
     }
 
@@ -250,7 +264,7 @@ impl AstAnalyzer {
             "medium",
             Some("Use find_program_address for canonical bumps"),
             call.span(),
-            "create_program_address call"
+            "create_program_address call",
         );
     }
 
@@ -262,7 +276,7 @@ impl AstAnalyzer {
             "high",
             Some("Add loop bounds and compute budget checks"),
             loop_expr.span(),
-            "unbounded loop"
+            "unbounded loop",
         );
     }
 
@@ -274,7 +288,7 @@ impl AstAnalyzer {
             "medium",
             Some("Ensure while loop has proper termination conditions"),
             while_expr.span(),
-            "while loop"
+            "while loop",
         );
     }
 
@@ -286,7 +300,7 @@ impl AstAnalyzer {
             "low",
             Some("Ensure for loop has reasonable iteration bounds"),
             for_loop.span(),
-            "for loop"
+            "for loop",
         );
     }
 
@@ -298,7 +312,7 @@ impl AstAnalyzer {
             "low",
             Some("Ensure function doesn't have recursion depth issues"),
             func.span(),
-            "function definition"
+            "function definition",
         );
     }
 
@@ -310,7 +324,7 @@ impl AstAnalyzer {
             "medium",
             Some("Ensure structs have proper discriminators if used as accounts"),
             struct_item.span(),
-            "struct definition"
+            "struct definition",
         );
     }
 }

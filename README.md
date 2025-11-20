@@ -81,6 +81,39 @@ solray-audit --test-programs
 solray-audit --test-programs --use-ast --use-llm
 ```
 
+### Solidity / EVM (beta)
+```bash
+# Point Solray at Lido V3 core contracts (Hoodi testnet scope)
+solray-audit evm \
+  --repo ../lidofinance/core \
+  --targets contracts/0.8.25/VaultHub.sol,contracts/0.8.25/StakingVault.sol,contracts/0.8.25/WithdrawalVault.sol \
+  --rules rules_evm.toml \
+  --use-ast
+
+# Scan every ABI artifact in a directory (recursively)
+solray-audit evm \
+  --repo external/lido-oracle \
+  --target-dir assets \
+  --rules rules_evm.toml
+
+# Smoke-test the bundled vulnerable Solidity sample
+solray-audit evm \
+  --repo . \
+  --targets examples/evm/VulnerableVault.sol \
+  --rules rules_evm.toml \
+  --use-ast
+```
+
+- `--repo` anchors relative paths to the cloned repo (or drop it to pass absolute paths/flattened sources from https://hoodi.etherscan.io).
+- `--target-dir` auto-discovers every `.sol` and `.json` file under the supplied folder(s), making it easy to audit ABI drops such as `external/lido-oracle/assets`.
+- `rules_evm.toml` ships with starter patterns covering delegatecall usage, HashConsensus quorum changes, and Lido-specific access-control checks (`EVM-1001` is backed by the AST analyzer via `ethers-solc`).
+- Primary Immunefi scope (chainId **560048**, “Hoodi” testnet) covers: `Lido.sol`, `VaultHub.sol`, `StakingVault (PinnedBeaconProxy)`, `WithdrawalVault.sol`, `DepositSecurityModule.sol`, `EIP712StETH.sol`, `VaultFactory.sol`, `LazyOracle.sol`, `OracleDaemonConfig.sol`, and both `HashConsensus.sol` deployments (Accounting + ValidatorsExitBus). See https://immunefi.com/audit-competition/lido-v3-bug-bounty-competition/scope/ and https://docs.lido.fi/deployed-contracts/hoodi/ for verified addresses & ABIs.
+- High-signal checks to encode as rules/fuzz tests:
+  * **VaultHub/stVaults**: `locked == liability + reserve`, PDG’s `1 + 31 ETH` staging and force-rebalance limits, shortfall rollups (see https://hackmd.io/@lido/stVaults-design and release `v3.0.0-rc.4` notes).
+  * **EIP712StETH**: Domain separator binds `chainId == 560048` and version/name; watch for replayable `permit`.
+  * **Oracle stack** (`LazyOracle`, `HashConsensus`, `OracleReportSanityChecker`): stale frame rejection, quorum math (`setMinQuorum`), report replay, sanity-check bypass (see https://docs.lido.fi/contracts/oracle-report-sanity-checker/ and oracle release `7.0.0-beta.3`).
+- Prefer Foundry invariants from Lido’s `CONTRIBUTING.md` (Feat/vaults branch) for runtime coverage, then feed generated artifacts/ABIs back into Solray for rule-based diffs.
+
 ### Environment Setup for LLM Analysis
 
 Create a `.env` file with your API keys:

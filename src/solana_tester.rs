@@ -1,8 +1,8 @@
-use std::path::Path;
-use std::fs;
-use tempfile::TempDir;
-use crate::{Vulnerability, AstAnalyzer, LLMAnalyzer};
+use crate::{AstAnalyzer, LLMAnalyzer, Vulnerability};
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
+use tempfile::TempDir;
 
 pub struct SolanaProgramTester {
     temp_dir: TempDir,
@@ -18,14 +18,25 @@ impl SolanaProgramTester {
         })
     }
 
-    pub async fn test_popular_programs(&mut self) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
+    pub async fn test_popular_programs(
+        &mut self,
+    ) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
         let mut all_vulnerabilities = Vec::new();
 
         // Test popular Solana programs
         let programs_to_test = vec![
-            ("anchor-examples", "https://github.com/coral-xyz/anchor/tree/master/examples"),
-            ("solana-program-library", "https://github.com/solana-labs/solana-program-library"),
-            ("metaplex-program-library", "https://github.com/metaplex-foundation/metaplex-program-library"),
+            (
+                "anchor-examples",
+                "https://github.com/coral-xyz/anchor/tree/master/examples",
+            ),
+            (
+                "solana-program-library",
+                "https://github.com/solana-labs/solana-program-library",
+            ),
+            (
+                "metaplex-program-library",
+                "https://github.com/metaplex-foundation/metaplex-program-library",
+            ),
             ("raydium-amm", "https://github.com/raydium-io/raydium-amm"),
             ("orca-whirlpools", "https://github.com/orca-so/whirlpools"),
         ];
@@ -46,9 +57,13 @@ impl SolanaProgramTester {
         Ok(all_vulnerabilities)
     }
 
-    async fn clone_and_analyze_program(&mut self, name: &str, _url: &str) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
+    async fn clone_and_analyze_program(
+        &mut self,
+        name: &str,
+        _url: &str,
+    ) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
         let program_path = self.temp_dir.path().join(name);
-        
+
         // Clone the repository
         if program_path.exists() {
             fs::remove_dir_all(&program_path)?;
@@ -57,16 +72,21 @@ impl SolanaProgramTester {
         // For demo purposes, we'll create a mock program structure
         // In a real implementation, you'd clone the actual repositories
         self.create_mock_solana_program(&program_path, name)?;
-        
-        self.programs.insert(name.to_string(), program_path.to_string_lossy().to_string());
+
+        self.programs
+            .insert(name.to_string(), program_path.to_string_lossy().to_string());
 
         // Analyze the program
         self.analyze_program_directory(&program_path).await
     }
 
-    fn create_mock_solana_program(&self, path: &Path, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_mock_solana_program(
+        &self,
+        path: &Path,
+        name: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir_all(path)?;
-        
+
         // Create a mock program with common vulnerabilities
         let mock_code = match name {
             "anchor-examples" => self.create_mock_anchor_program(),
@@ -151,7 +171,8 @@ pub struct DataAccount {
     pub data: u64,
     pub balance: u64,
 }
-"#.to_string()
+"#
+        .to_string()
     }
 
     fn create_mock_amm_program(&self) -> String {
@@ -252,7 +273,8 @@ pub struct Pool {
     pub reserve_out: u64,
     pub frozen: bool,
 }
-"#.to_string()
+"#
+        .to_string()
     }
 
     fn create_mock_pool_program(&self) -> String {
@@ -321,7 +343,8 @@ pub struct Pool {
     pub bump: u8,
     pub total_supply: u64,
 }
-"#.to_string()
+"#
+        .to_string()
     }
 
     fn create_generic_mock_program(&self) -> String {
@@ -351,19 +374,23 @@ pub struct Generic<'info> {
 pub struct GenericAccount {
     pub data: u64,
 }
-"#.to_string()
+"#
+        .to_string()
     }
 
-    async fn analyze_program_directory(&self, path: &Path) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
+    async fn analyze_program_directory(
+        &self,
+        path: &Path,
+    ) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
         let mut all_vulnerabilities = Vec::new();
 
         // Find all Rust files
         let rust_files = self.find_rust_files(path)?;
-        
+
         for file_path in rust_files {
             let code = fs::read_to_string(&file_path)?;
             let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
-            
+
             // AST Analysis
             let mut ast_analyzer = AstAnalyzer::new(Some(file_name.clone()));
             let ast_vulns = ast_analyzer.analyze(&code);
@@ -372,7 +399,10 @@ pub struct GenericAccount {
             // LLM Analysis (if API keys are available)
             let llm_analyzer = LLMAnalyzer::new();
             if llm_analyzer.has_api_keys() {
-                match llm_analyzer.analyze_with_openai(&code, "Solana program analysis").await {
+                match llm_analyzer
+                    .analyze_with_openai(&code, "Solana program analysis")
+                    .await
+                {
                     Ok(llm_vulns) => all_vulnerabilities.extend(llm_vulns),
                     Err(e) => eprintln!("LLM analysis failed for {}: {}", file_name, e),
                 }
@@ -382,14 +412,17 @@ pub struct GenericAccount {
         Ok(all_vulnerabilities)
     }
 
-    fn find_rust_files(&self, path: &Path) -> Result<Vec<std::path::PathBuf>, Box<dyn std::error::Error>> {
+    fn find_rust_files(
+        &self,
+        path: &Path,
+    ) -> Result<Vec<std::path::PathBuf>, Box<dyn std::error::Error>> {
         let mut rust_files = Vec::new();
-        
+
         if path.is_dir() {
             for entry in fs::read_dir(path)? {
                 let entry = entry?;
                 let path = entry.path();
-                
+
                 if path.is_dir() {
                     rust_files.extend(self.find_rust_files(&path)?);
                 } else if path.extension().map_or(false, |ext| ext == "rs") {
@@ -397,7 +430,7 @@ pub struct GenericAccount {
                 }
             }
         }
-        
+
         Ok(rust_files)
     }
 

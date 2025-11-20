@@ -1,6 +1,6 @@
+use crate::Vulnerability;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use crate::Vulnerability;
 use std::env;
 
 #[derive(Serialize)]
@@ -33,12 +33,14 @@ struct Message {
 }
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct AnthropicMessage {
     role: String,
     content: String,
 }
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct AnthropicRequest {
     model: String,
     max_tokens: u32,
@@ -46,11 +48,13 @@ struct AnthropicRequest {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct AnthropicResponse {
     content: Vec<AnthropicContent>,
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct AnthropicContent {
     text: String,
 }
@@ -70,12 +74,18 @@ impl LLMAnalyzer {
         }
     }
 
-    pub async fn analyze_with_openai(&self, code: &str, context: &str) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
-        let api_key = self.openai_api_key.as_ref()
+    pub async fn analyze_with_openai(
+        &self,
+        code: &str,
+        context: &str,
+    ) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
+        let api_key = self
+            .openai_api_key
+            .as_ref()
             .ok_or("OPENAI_API_KEY not set")?;
 
         let prompt = self.build_solana_security_prompt(code, context);
-        
+
         let request = OpenAIRequest {
             model: "gpt-4".to_string(),
             messages: vec![
@@ -92,7 +102,8 @@ impl LLMAnalyzer {
             max_tokens: 2000,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
@@ -101,7 +112,7 @@ impl LLMAnalyzer {
             .await?;
 
         let openai_response: OpenAIResponse = response.json().await?;
-        
+
         if let Some(choice) = openai_response.choices.first() {
             self.parse_llm_response(&choice.message.content)
         } else {
@@ -109,27 +120,34 @@ impl LLMAnalyzer {
         }
     }
 
-    pub async fn analyze_with_anthropic(&self, code: &str, context: &str) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
-        let api_key = self.anthropic_api_key.as_ref()
+    #[allow(dead_code)]
+    pub async fn analyze_with_anthropic(
+        &self,
+        code: &str,
+        context: &str,
+    ) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
+        let api_key = self
+            .anthropic_api_key
+            .as_ref()
             .ok_or("ANTHROPIC_API_KEY not set")?;
 
         let prompt = self.build_solana_security_prompt(code, context);
-        
+
         let request = AnthropicRequest {
             model: "claude-3-sonnet-20240229".to_string(),
             max_tokens: 2000,
-            messages: vec![
-                AnthropicMessage {
-                    role: "user".to_string(),
-                    content: format!("{}\n\n{}", 
-                        "You are a Solana security expert. Analyze the following Rust code for vulnerabilities and return JSON with findings.",
-                        prompt
-                    ),
-                }
-            ],
+            messages: vec![AnthropicMessage {
+                role: "user".to_string(),
+                content: format!(
+                    "{}\n\n{}",
+                    "You are a Solana security expert. Analyze the following Rust code for vulnerabilities and return JSON with findings.",
+                    prompt
+                ),
+            }],
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", api_key)
             .header("Content-Type", "application/json")
@@ -139,7 +157,7 @@ impl LLMAnalyzer {
             .await?;
 
         let anthropic_response: AnthropicResponse = response.json().await?;
-        
+
         if let Some(content) = anthropic_response.content.first() {
             self.parse_llm_response(&content.text)
         } else {
@@ -196,7 +214,10 @@ Context: {}
         )
     }
 
-    fn parse_llm_response(&self, response: &str) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
+    fn parse_llm_response(
+        &self,
+        response: &str,
+    ) -> Result<Vec<Vulnerability>, Box<dyn std::error::Error>> {
         // Try to extract JSON from the response
         let json_start = response.find('[').unwrap_or(0);
         let json_end = response.rfind(']').map(|i| i + 1).unwrap_or(response.len());

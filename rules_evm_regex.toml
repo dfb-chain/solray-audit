@@ -1,0 +1,68 @@
+[[rules]]
+id = "EVM-1001"
+description = "Setter/update functions lack access control"
+severity = "high"
+patterns = []
+enabled = true
+mitigation = "Add role/owner/guardian modifiers or vault ACL checks before mutating protocol configuration."
+
+[[rules]]
+id = "EVM-2001"
+description = "delegatecall detected - ensure target is immutable and trusted"
+severity = "high"
+patterns = ["delegatecall\\s*\\("]
+enabled = true
+mitigation = "Restrict delegatecall targets to immutable addresses (e.g. pinned beacon) and gate upgrade paths with governance."
+
+[[rules]]
+id = "EVM-2002"
+description = "Low-level call with value before effects (possible reentrancy)"
+severity = "medium"
+patterns = ["\\.call\\s*\\{\\s*value"]
+enabled = true
+mitigation = "Apply checks-effects-interactions, reentrancy guards, and limit arbitrary call targets."
+
+[[rules]]
+id = "EVM-3001"
+description = "HashConsensus quorum/math update without minimum member checks"
+severity = "medium"
+patterns = ["setMinQuorum","setQuorum","configureConsensus"]
+enabled = true
+mitigation = "Validate quorum updates against total members and emit events for off-chain monitoring."
+
+[[rules]]
+id = "EVM-4001"
+description = "EIP-712 domain separator or permit code"
+severity = "medium"
+patterns = ["EIP712","DOMAIN_SEPARATOR","permit\\("]
+enabled = true
+mitigation = "Confirm DOMAIN_SEPARATOR components follow EIP-712 (name, version, chainId, salt) and prevent replay attacks."
+
+[[rules]]
+id = "EVM-5001"
+description = "HashConsensus frame configuration setters must enforce sane bounds"
+severity = "medium"
+patterns = ["setFrameConfig","configureFrame","setFrame"]
+enabled = true
+mitigation = "Require governance-only access and validate frame duration/min/max quorum inputs."
+
+[[rules]]
+id = "EVM-5002"
+description = "LazyOracle oracles applying reports must sanity-check data"
+severity = "medium"
+patterns = ["applyReport","pushReport","submitReport"]
+enabled = true
+mitigation = "Enforce sanity-checker gating and reject stale frame numbers before mutating state."
+
+[[rules]]
+id = "EVM-6001"
+description = "Vault reserve/liability setters should enforce locked == liabilities + reserve"
+severity = "medium"
+patterns = ["setReserve","setLiability","setLockedValue","setForceRebalance"]
+enabled = true
+mitigation = "Validate reserve/liability invariants (locked >= liability + reserve) and guard setters with governance."
+
+[analysis_mode]
+regex = true
+ast = false
+llm = false
